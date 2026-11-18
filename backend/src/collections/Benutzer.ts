@@ -57,14 +57,26 @@ export const Benutzer: CollectionConfig = {
         { label: 'Admin', value: 'ADMIN' },
       ],
       access: { create: ({ req }) => istAdmin(req.user), update: ({ req }) => istAdmin(req.user) },
+      // Bei der ersten Registrierung (noch niemand angemeldet) ausgeblendet: der erste Benutzer wird automatisch Admin.
+      admin: { condition: (_data, _sibling, { user }) => Boolean(user), description: 'Admins dürfen zusätzlich Veranstaltungen, Benutzer und Einstellungen verwalten.' },
     },
     {
       name: 'aktiv',
       type: 'checkbox',
       defaultValue: true,
       label: 'Aktiv',
+      admin: { condition: (_data, _sibling, { user }) => Boolean(user) },
       access: { create: ({ req }) => istAdmin(req.user), update: ({ req }) => istAdmin(req.user) },
     },
-    { name: 'fachgebiete', type: 'text', hasMany: true, label: 'Fachgebiete' },
+    {
+      name: 'fachgebiete',
+      type: 'text',
+      hasMany: true,
+      label: 'Fachgebiete (optional)',
+      admin: {
+        description: 'Freitext, keine feste Liste: Begriff eintippen und mit Enter bestätigen, z. B. „Elektrogeräte“, „Fahrrad“, „Textil“. Kann leer bleiben.',
+        condition: (_data, _sibling, { user }) => Boolean(user),
+      },
+    },
   ],
 }
