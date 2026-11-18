@@ -8,7 +8,8 @@ export const Benutzer: CollectionConfig = {
     tokenExpiration: 60 * 60 * 12,
     maxLoginAttempts: 5,
     lockTime: 10 * 60 * 1000,
-    cookies: { sameSite: 'Lax', secure: process.env.NODE_ENV === 'production' },
+    // Secure-Cookie nur über HTTPS, sonst verwirft der Browser es (z. B. bei http://localhost)
+    cookies: { sameSite: 'Lax', secure: (process.env.PUBLIC_URL || '').startsWith('https://') },
   },
   admin: {
     useAsTitle: 'name',
@@ -31,7 +32,10 @@ export const Benutzer: CollectionConfig = {
         // Der erste angelegte Benutzer (first-register) wird Admin; danach vergeben nur Admins Rollen.
         if (operation === 'create') {
           const vorhanden = await req.payload.count({ collection: 'benutzer', req, overrideAccess: true })
-          if (vorhanden.totalDocs === 0) data.rolle = 'ADMIN'
+          if (vorhanden.totalDocs === 0) {
+            data.rolle = 'ADMIN'
+            data.aktiv = true // das Formular schickt sonst ein ungehaktes „Aktiv“ als false mit
+          }
         }
         return data
       },

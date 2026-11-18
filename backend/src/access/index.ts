@@ -1,6 +1,6 @@
 import type { Access, FieldAccess } from 'payload'
 
-type NutzerLike = { id?: number | string; collection?: string; rolle?: string; aktiv?: boolean | null } | null | undefined
+type NutzerLike = { id?: number | string; collection?: string; rolle?: string | null; aktiv?: boolean | null } | null | undefined
 
 /** Eingeloggter, aktiver Reparista oder Admin. Gäste haben nie einen Login. */
 export function istReparista(user: NutzerLike): boolean {

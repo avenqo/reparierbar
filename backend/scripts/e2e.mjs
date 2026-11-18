@@ -26,12 +26,12 @@ async function api(pfad, { method = 'GET', body, jwt, schluessel, form } = {}) {
 const erwarte = (r, status, was) => assert.equal(r.status, status, `${was}: erwartet ${status}, bekam ${r.status} ${JSON.stringify(r.daten).slice(0, 300)}`)
 
 // --- Benutzer ---
-let r = await api('/benutzer/first-register', { method: 'POST', body: { email: 'admin@test.de', password: 'Passwort-123', name: 'Admin' } })
+let r = await api('/benutzer/first-register', { method: 'POST', body: { email: 'admin@test.de', password: 'Passwort-123', 'confirm-password': 'Passwort-123', name: 'Admin', rolle: 'REPARISTA', aktiv: false, fachgebiete: [] } }) // wie das Formular im Admin-Panel
 erwarte(r, 200, 'first-register')
 r = await api('/benutzer/login', { method: 'POST', body: { email: 'admin@test.de', password: 'Passwort-123' } })
 erwarte(r, 200, 'login')
 const admin = r.daten.token
-assert.equal(r.daten.user.rolle, 'ADMIN')
+assert.equal(r.daten.user.rolle, 'ADMIN'); assert.equal(r.daten.user.aktiv, true)
 ok('erster Benutzer ist Admin und kann sich anmelden')
 
 r = await api('/benutzer', { method: 'POST', jwt: admin, body: { email: 'anna@test.de', password: 'Passwort-123', name: 'Anna', rolle: 'REPARISTA' } })

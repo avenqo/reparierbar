@@ -187,8 +187,14 @@ export interface Auftraege {
 export interface Benutzer {
   id: number;
   name: string;
-  rolle: 'REPARISTA' | 'ADMIN';
+  /**
+   * Admins dürfen zusätzlich Veranstaltungen, Benutzer und Einstellungen verwalten.
+   */
+  rolle?: ('REPARISTA' | 'ADMIN') | null;
   aktiv?: boolean | null;
+  /**
+   * Freitext, keine feste Liste: Begriff eintippen und mit Enter bestätigen, z. B. „Elektrogeräte“, „Fahrrad“, „Textil“. Kann leer bleiben.
+   */
   fachgebiete?: string[] | null;
   updatedAt: string;
   createdAt: string;
