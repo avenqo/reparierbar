@@ -782,7 +782,7 @@ export interface Einstellungen {
   farbeAkzent?: string | null;
   farbeText?: string | null;
   /**
-   * Öffentlich erreichbare Bilddatei (SVG oder PNG).
+   * Öffentlich erreichbare Bilddatei (SVG oder PNG). Leer lassen für das mitgelieferte Logo (/logo.svg) in den Farben oben.
    */
   logoUrl?: string | null;
   standardBeginn?: string | null;

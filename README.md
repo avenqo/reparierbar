@@ -1,3 +1,5 @@
+<p align="center"><img src="backend/public/logo.svg" alt="ReparierBar" width="96"></p>
+
 # ReparierBar
 
 Terminanmeldung für **Repair Cafés** – gedacht für jede Kommune, die ein Repair Café betreibt. Das Repair Café Kremmen ist der erste Nutzer.

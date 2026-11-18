@@ -34,7 +34,7 @@ export const Einstellungen: GlobalConfig = {
             { name: 'farbePrimaer', type: 'text', defaultValue: STANDARD.farbePrimaer, label: 'Primärfarbe', validate: hex },
             { name: 'farbeAkzent', type: 'text', defaultValue: STANDARD.farbeAkzent, label: 'Akzentfarbe', validate: hex },
             { name: 'farbeText', type: 'text', defaultValue: STANDARD.farbeText, label: 'Textfarbe', validate: hex },
-            { name: 'logoUrl', type: 'text', label: 'Logo (URL)', admin: { description: 'Öffentlich erreichbare Bilddatei (SVG oder PNG).' } },
+            { name: 'logoUrl', type: 'text', label: 'Logo (URL)', admin: { description: 'Öffentlich erreichbare Bilddatei (SVG oder PNG). Leer lassen für das mitgelieferte Logo (/logo.svg) in den Farben oben.' } },
           ],
         },
         {

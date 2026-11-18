@@ -50,7 +50,7 @@ export default buildConfig({
   admin: {
     user: 'benutzer',
     importMap: { baseDir: path.resolve(dirname) },
-    meta: { titleSuffix: ` – ${process.env.INSTANZ_NAME || 'ReparierBar'}` },
+    meta: { icons: [{ rel: 'icon', type: 'image/svg+xml', url: '/logo.svg' }], titleSuffix: ` – ${process.env.INSTANZ_NAME || 'ReparierBar'}` },
     components: { graphics: { Logo: '/components/Logo#Logo', Icon: '/components/Icon#Icon' } },
   },
   globals: [Einstellungen],
