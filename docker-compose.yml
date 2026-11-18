@@ -1,0 +1,58 @@
+# ReparierBar auf ofuk125: eigener Stack hinter dem bestehenden Reverse Proxy
+# (repaircafe.kremmener.info → rc-app:3000). Konfiguration über .env (siehe .env.example).
+services:
+  rc-app:
+    build: .
+    container_name: rc-app
+    restart: unless-stopped
+    depends_on:
+      rc-db:
+        condition: service_healthy
+    environment:
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET:?PAYLOAD_SECRET fehlt}
+      DATABASE_URI: postgres://reparierbar:${DB_PASSWORD:?DB_PASSWORD fehlt}@rc-db:5432/reparierbar
+      PUBLIC_URL: ${PUBLIC_URL:-https://repaircafe.kremmener.info}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-repaircafe@kremmener.info}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Repair Café Kremmen}
+      BILDER_DIR: /data/bilder
+      TZ: Europe/Berlin
+    volumes:
+      - rc-bilder:/data/bilder
+    ports:
+      - "127.0.0.1:3100:3000" # nur für den Reverse Proxy auf dem Host
+    networks: [rc-intern]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  rc-db:
+    image: postgres:16-alpine
+    container_name: rc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: reparierbar
+      POSTGRES_USER: reparierbar
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD fehlt}
+    volumes:
+      - rc-db-data:/var/lib/postgresql/data
+    networks: [rc-intern] # nur im internen Docker-Netz erreichbar
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reparierbar -d reparierbar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rc-bilder:
+  rc-db-data:
+
+networks:
+  rc-intern:

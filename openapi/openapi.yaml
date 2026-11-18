@@ -1,0 +1,542 @@
+openapi: 3.0.3
+info:
+  title: ReparierBar – Fach-Endpunkte
+  version: 0.1.0
+  description: |
+    Fach-Endpunkte der ReparierBar (Repair Café Kremmen). Die Standard-Endpunkte von Payload
+    (`/api/<collection>`, Login unter `/api/benutzer/login` …) sind hier nicht beschrieben.
+    Fehler kommen im Payload-Format `{ "errors": [{ "message": "…" }] }`.
+    Gäste melden sich nie an: Sie schicken den Schlüssel ihres persönlichen Links im Header
+    `X-Auftrag-Schluessel`. Reparistas und Admins nutzen das Cookie bzw. `Authorization: JWT <token>`.
+servers:
+  - url: https://repaircafe.kremmener.info/api
+tags:
+  - name: Öffentlich
+  - name: Gast
+  - name: Reparista
+  - name: Admin
+components:
+  securitySchemes:
+    gastSchluessel:
+      type: apiKey
+      in: header
+      name: X-Auftrag-Schluessel
+    benutzerJwt:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "`JWT <token>` aus /benutzer/login (alternativ HTTP-only-Cookie)"
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    Fehler:
+      description: Fehler (400 ungültig, 401/403 Rechte, 404 unbekannt, 409 Konflikt, 422 Regel verletzt, 429 zu viele Anfragen)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Fehler' }
+  schemas:
+    Fehler:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties: { message: { type: string } }
+    Uhrzeit:
+      type: string
+      pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+      example: '10:30'
+      description: Ankunftszeit in Berliner Ortszeit, im Raster der Veranstaltung (Standard 15 Minuten)
+    Status:
+      type: string
+      enum: [EINGEGANGEN, UEBERNOMMEN, GEGENVORSCHLAG, BESTAETIGT, ERLEDIGT, STORNIERT]
+    Ergebnis:
+      type: string
+      enum: [REPARIERT, TEILWEISE, NICHT_REPARIERBAR, NICHT_ERSCHIENEN]
+    Kontakt:
+      type: object
+      properties:
+        name: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 200 }
+        telefon: { type: string, maxLength: 40 }
+    Anfrage:
+      type: object
+      required: [geraetekategorie, veranstaltung, fehlerbeschreibung]
+      properties:
+        geraetekategorie: { type: integer }
+        hersteller: { type: string, maxLength: 60, description: Öffentlich sichtbar }
+        typ: { type: string, maxLength: 60, description: Öffentlich sichtbar }
+        fehlerbeschreibung: { type: string, maxLength: 2000 }
+        veranstaltung: { type: integer }
+        wunschAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        kontakt: { $ref: '#/components/schemas/Kontakt' }
+        einwilligung:
+          type: boolean
+          description: Pflicht, sobald Kontaktdaten angegeben werden
+        kanal: { type: string, enum: [APP, WEB] }
+    TelefonAnfrage:
+      allOf:
+        - $ref: '#/components/schemas/Anfrage'
+        - type: object
+          properties:
+            terminAnkunft:
+              allOf: [{ $ref: '#/components/schemas/Uhrzeit' }]
+              description: Setzt den Termin direkt auf bestätigt (Reparista wird Verantwortlicher)
+            uebernehmen:
+              type: boolean
+              description: Auftrag ohne Termin übernehmen
+    AuftragKurz:
+      type: object
+      properties:
+        id: { type: integer }
+        nummer: { type: string, example: RC-2026-0042 }
+        status: { $ref: '#/components/schemas/Status' }
+        veranstaltung: { type: integer }
+        wunschAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        terminAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        vorschlagAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        verantwortlich: { type: integer, nullable: true }
+        vertretungGesucht: { type: boolean }
+        ergebnis: { $ref: '#/components/schemas/Ergebnis' }
+    Ergebnisantwort:
+      type: object
+      properties:
+        auftrag: { $ref: '#/components/schemas/AuftragKurz' }
+        warnungen:
+          type: array
+          items: { type: string }
+          description: Überschneidung mit einer eigenen Zusage (warnt nur, verhindert nichts)
+    GastAuftrag:
+      type: object
+      properties:
+        nummer: { type: string }
+        status: { $ref: '#/components/schemas/Status' }
+        kanal: { type: string }
+        geraetekategorie: { type: integer }
+        hersteller: { type: string, nullable: true }
+        typ: { type: string, nullable: true }
+        fehlerbeschreibung: { type: string, nullable: true }
+        veranstaltung:
+          type: object
+          properties:
+            id: { type: integer }
+            datum: { type: string, format: date-time }
+            beginn: { type: string }
+            ende: { type: string }
+            ort: { type: string }
+        wunschAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        terminAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        vorschlagAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        ergebnis: { $ref: '#/components/schemas/Ergebnis' }
+        kontakt: { $ref: '#/components/schemas/Kontakt' }
+        bilder:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              reihenfolge: { type: integer, nullable: true }
+paths:
+  /veranstaltungen/{id}/belegung:
+    get:
+      tags: [Öffentlich]
+      summary: Belegung einer Veranstaltung (ohne Personendaten)
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          description: Ankunftszeiten mit Kategorie, Hersteller, Typ und Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  veranstaltung: { type: object }
+                  belegung:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ankunft: { $ref: '#/components/schemas/Uhrzeit' }
+                        geraetekategorie: { type: string, nullable: true }
+                        hersteller: { type: string, nullable: true }
+                        typ: { type: string, nullable: true }
+                        status: { type: string, enum: [ANGEFRAGT, BESTAETIGT] }
+        '404': { $ref: '#/components/responses/Fehler' }
+  /gast/anfrage:
+    post:
+      tags: [Gast]
+      summary: Anfrage ohne Login anlegen
+      description: |
+        Wunsch-Ankunftszeit nur mit E-Mail-Adresse. Die Antwort enthält den persönlichen Schlüssel
+        einmalig im Klartext; die App speichert ihn im Secure Storage und sendet ihn als `X-Auftrag-Schluessel`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Anfrage' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nummer: { type: string }
+                  status: { $ref: '#/components/schemas/Status' }
+                  schluessel: { type: string }
+                  link: { type: string, format: uri }
+        '422': { $ref: '#/components/responses/Fehler' }
+        '429': { $ref: '#/components/responses/Fehler' }
+  /gast/das-war-ich-nicht:
+    post:
+      tags: [Gast]
+      summary: Aus der Mail – storniert die Anfrage und sperrt die Adresse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nummer, token]
+              properties:
+                nummer: { type: string }
+                token: { type: string }
+      responses:
+        '200': { description: Erledigt }
+        '401': { $ref: '#/components/responses/Fehler' }
+  /gast/auftrag:
+    get:
+      tags: [Gast]
+      summary: Eigenen Auftrag lesen
+      security: [{ gastSchluessel: [] }]
+      responses:
+        '200':
+          description: Auftrag
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GastAuftrag' }
+        '401': { $ref: '#/components/responses/Fehler' }
+    patch:
+      tags: [Gast]
+      summary: Beschreibung oder Kontakt ergänzen
+      security: [{ gastSchluessel: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fehlerbeschreibung: { type: string }
+                hersteller: { type: string }
+                typ: { type: string }
+                kontakt: { $ref: '#/components/schemas/Kontakt' }
+                einwilligung: { type: boolean }
+      responses:
+        '200':
+          description: Aktualisierter Auftrag
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GastAuftrag' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /gast/auftrag/bilder:
+    post:
+      tags: [Gast]
+      summary: Bild hochladen (höchstens 3, JPEG/PNG/WebP, 5 MB)
+      security: [{ gastSchluessel: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  reihenfolge: { type: integer, nullable: true }
+        '422': { $ref: '#/components/responses/Fehler' }
+    delete:
+      tags: [Gast]
+      summary: Bild entfernen
+      security: [{ gastSchluessel: [] }]
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Entfernt }
+        '404': { $ref: '#/components/responses/Fehler' }
+  /gast/auftrag/bilder/{id}:
+    get:
+      tags: [Gast]
+      summary: Bild oder Vorschau abrufen
+      security: [{ gastSchluessel: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+        - { name: groesse, in: query, schema: { type: string, enum: [vorschau, original], default: vorschau } }
+      responses:
+        '200':
+          description: JPEG
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Fehler' }
+  /gast/auftrag/vorschlag/annehmen:
+    post:
+      tags: [Gast]
+      summary: Gegenvorschlag annehmen
+      description: Mit Header `X-Auftrag-Schluessel` oder – aus dem Mail-Link – mit `nummer` und `token` im Body.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nummer: { type: string }
+                token: { type: string }
+      responses:
+        '200':
+          description: Termin bestätigt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuftragKurz' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /gast/auftrag/vorschlag/ablehnen:
+    post:
+      tags: [Gast]
+      summary: Gegenvorschlag ablehnen (Auftrag geht zurück auf Eingegangen)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nummer: { type: string }
+                token: { type: string }
+      responses:
+        '200':
+          description: Abgelehnt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuftragKurz' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /gast/auftrag/stornieren:
+    post:
+      tags: [Gast]
+      summary: Anfrage zurückziehen
+      security: [{ gastSchluessel: [] }]
+      responses:
+        '200':
+          description: Storniert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuftragKurz' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /veranstaltungen/{id}/tagesliste:
+    get:
+      tags: [Reparista]
+      summary: Alle Geräte des Tages mit Ankunftszeit und Notizen
+      description: "Kontaktdaten nur für Aufträge, für die der Reparista verantwortlich ist (Admins: alle)."
+      security: [{ benutzerJwt: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Tagesliste }
+        '401': { $ref: '#/components/responses/Fehler' }
+  /auftraege/telefon:
+    post:
+      tags: [Reparista]
+      summary: Telefonische Anmeldung (alle Felder, auch bestätigter Termin)
+      security: [{ benutzerJwt: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TelefonAnfrage' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AuftragKurz'
+                  - type: object
+                    properties:
+                      schluessel: { type: string }
+                      warnungen: { type: array, items: { type: string } }
+  /auftraege/{id}/bestaetigen:
+    post:
+      tags: [Reparista]
+      summary: Wunsch-Ankunftszeit zusagen (wird Verantwortlicher)
+      security: [{ benutzerJwt: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          description: Bestätigt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ergebnisantwort' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /auftraege/{id}/gegenvorschlag:
+    post:
+      tags: [Reparista]
+      summary: Andere Ankunftszeit vorschlagen (nur mit E-Mail; wird Verantwortlicher)
+      security: [{ benutzerJwt: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ankunft]
+              properties:
+                ankunft: { $ref: '#/components/schemas/Uhrzeit' }
+      responses:
+        '200':
+          description: Vorschlag gesendet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ergebnisantwort' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /auftraege/{id}/termin:
+    post:
+      tags: [Reparista]
+      summary: Termin direkt ändern (alle Reparistas; Verantwortung bleibt)
+      security: [{ benutzerJwt: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ankunft, grund]
+              properties:
+                ankunft: { $ref: '#/components/schemas/Uhrzeit' }
+                grund: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Geändert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ergebnisantwort' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /auftraege/{id}/uebernehmen:
+    post:
+      tags: [Reparista]
+      summary: Ohne Termin übernehmen – oder Vertretung für einen bestätigten Termin
+      security: [{ benutzerJwt: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          description: Übernommen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ergebnisantwort' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /auftraege/{id}/abgeben:
+    post:
+      tags: [Reparista]
+      summary: "Verantwortung abgeben (bei bestätigtem Termin: „Vertretung gesucht“)"
+      security: [{ benutzerJwt: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          description: Abgegeben
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ergebnisantwort' }
+        '403': { $ref: '#/components/responses/Fehler' }
+  /auftraege/{id}/abschliessen:
+    post:
+      tags: [Reparista]
+      summary: Auftrag abschließen
+      security: [{ benutzerJwt: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ergebnis]
+              properties:
+                ergebnis: { $ref: '#/components/schemas/Ergebnis' }
+      responses:
+        '200':
+          description: Abgeschlossen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ergebnisantwort' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /auftraege/{id}/stornieren:
+    post:
+      tags: [Reparista]
+      summary: Auftrag stornieren (jederzeit vor dem Termin)
+      security: [{ benutzerJwt: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grund: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Storniert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ergebnisantwort' }
+        '409': { $ref: '#/components/responses/Fehler' }
+  /admin/bereinigung:
+    post:
+      tags: [Admin]
+      summary: Alle Aufträge vor einem Datum löschen
+      security: [{ benutzerJwt: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vorDatum]
+              properties:
+                vorDatum: { type: string, format: date }
+                dryRun:
+                  type: boolean
+                  default: true
+                  description: Nur ein ausdrückliches `false` löscht wirklich
+      responses:
+        '200':
+          description: Ergebnis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dryRun: { type: boolean }
+                  anzahl: { type: integer }
+                  nummern: { type: array, items: { type: string } }
+        '403': { $ref: '#/components/responses/Fehler' }
+  /health:
+    get:
+      tags: [Öffentlich]
+      summary: Uptime-Check
+      responses:
+        '200': { description: ok }
+        '503': { description: Datenbank nicht erreichbar }
