@@ -85,4 +85,7 @@ Offen:
 - Admin-Ansicht für die Tagesliste (der Endpunkt existiert)
 - Push-Benachrichtigungen, Reparaturstatistik
 - Impressum, Datenschutzhinweise, AV-Verträge je Betreiber
-- Lizenz festlegen, bevor das Repo öffentlich wird
+
+## Lizenz
+
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). Wer die Software als Webdienst betreibt und verändert, muss den geänderten Quellcode den Nutzern bereitstellen.
