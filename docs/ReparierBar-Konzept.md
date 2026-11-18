@@ -46,7 +46,7 @@ flowchart LR
   browser["Browser<br/>Admin-Panel, später Gäste-Web"]
   directus["Directus (bestehend)<br/>getrennt, keine Kopplung"]
   payload["Payload-App (neu)<br/>REST: Collections + Endpunkte<br/>Login nur für Reparistas<br/>Rechte-Regeln, Hooks, Historie<br/>Uploads mit sharp, ohne EXIF<br/>Jobs: Mails, Erinnerung, Löschung<br/>Next.js + Payload in Docker"]
-  db[("PostgreSQL<br/>eigene Datenbank")]
+  db[("SQLite<br/>eine Datei")]
   bilder[("Bild-Volume<br/>max. 3 je Auftrag")]
   smtp["SMTP-Versand<br/>Mails an Gäste"]
 
@@ -69,7 +69,7 @@ Umgesetzt wird mit Payload 3, demselben Stack wie Beirat-dabei. Datenhaltung, Be
 | Baustein | Umsetzung | Hinweis |
 | --- | --- | --- |
 | Anwendung | Payload 3 auf Next.js, TypeScript | gleicher Stack wie Beirat-dabei, eigene Instanz |
-| Datenbank | PostgreSQL 16 über `@payloadcms/db-postgres` | Migrationen über Payload |
+| Datenbank | SQLite über `@payloadcms/db-sqlite` (eine Datei im Docker-Volume) | Migrationen über Payload; bei ~100 Anmeldungen im Jahr reicht das völlig |
 | Login Reparista/Admin | Auth-Collection `benutzer` (JWT bzw. HTTP-only-Cookie) | Einladung und Passwort-Reset eingebaut |
 | Gast-Zugang | kein Login; persönlicher Link mit Zufallsschlüssel (256 Bit), nur Hash in der DB, geprüft in eigenen Endpunkten | Gast muss sich nicht authentifizieren |
 | Fachlogik | eigene Endpunkte für Statuswechsel, Rechte-Regeln mit Abfragefiltern, Hooks | Statusfeld über die Standard-API nicht beschreibbar |
@@ -82,7 +82,7 @@ Umgesetzt wird mit Payload 3, demselben Stack wie Beirat-dabei. Datenhaltung, Be
 
 ## Datenmodell
 
-Jede frühere Tabelle wird eine Payload-Collection, Fremdschlüssel werden Relationen. Kontaktdaten sind eine Feldgruppe im Auftrag mit eigenem Lese-Recht, damit nur Verantwortlicher und Admin sie sehen. Payload löscht abhängige Dokumente nicht von selbst mit; das übernimmt ein `afterDelete`-Hook am Auftrag.
+Jede frühere Tabelle wird eine Payload-Collection, Fremdschlüssel werden Relationen. Kontaktdaten sind eine Feldgruppe im Auftrag mit eigenem Lese-Recht, damit nur Verantwortlicher und Admin sie sehen. Payload löscht abhängige Dokumente nicht von selbst mit; das übernimmt ein `beforeDelete`-Hook am Auftrag.
 
 | Collection | Wichtige Felder | Rechte und Hinweise |
 | --- | --- | --- |
@@ -193,7 +193,7 @@ Je Auftrag sind höchstens 3 Bilder mit je maximal 5 MB Upload erlaubt; gespeich
 3. **Verarbeitung:** sharp in Payload skaliert auf höchstens 1600 px und speichert als JPEG. `withMetadata: false` entfernt EXIF-Daten samt GPS-Position; `imageSizes` erzeugt eine Vorschau mit 400 px.
 4. **Ablage:** Die Dateien liegen in einem Docker-Volume, nicht in einem öffentlichen Verzeichnis.
 5. **Auslieferung:** Payload gibt Dateien nur heraus, wenn das Lese-Recht der Collection greift (Reparistas, Admins); Gäste bekommen ihre Bilder über den Gast-Endpunkt. In der öffentlichen Belegung erscheinen keine Bilder.
-6. **Löschen:** Der `afterDelete`-Hook des Auftrags löscht die Bild-Dokumente; Payload entfernt dabei die Dateien.
+6. **Löschen:** Der `beforeDelete`-Hook des Auftrags löscht die Bild-Dokumente; Payload entfernt dabei die Dateien.
 
 Platzbedarf: 1.000 Aufträge mit je 3 Bildern belegen grob 1–1,5 GB.
 
@@ -220,12 +220,11 @@ Die Payload-App läuft als eigener Docker-Compose-Stack auf ofuk125 hinter dem b
 | Container / Volume | Inhalt |
 | --- | --- |
 | `rc-app` | Payload 3 + Next.js (Node), mit `autoRun` für die Jobs |
-| `rc-db` | PostgreSQL 16, nur im internen Docker-Netz erreichbar |
 | `rc-bilder` (Volume) | Bilddateien der Upload-Collection |
 
 - **Konfiguration** über Umgebungsvariablen: `PAYLOAD_SECRET`, `DATABASE_URI`, SMTP-Zugang, öffentliche Basis-URL, Zeitzone.
 - **Erster Admin** wird beim ersten Aufruf von `/admin` angelegt, wie bei Beirat-dabei.
-- **Backup:** nächtlich `pg_dump` plus das Bild-Volume ins bestehende Backup; im selben Skript alte Images mit `docker image prune` aufräumen.
+- **Backup:** nächtlich eine Kopie der SQLite-Datei (`sqlite3 … ".backup"`) plus die Bilder ins bestehende Backup; im selben Skript alte Images mit `docker image prune` aufräumen.
 - **Überwachung:** eigener Endpunkt `/api/health` für den Uptime-Check; fehlgeschlagene Mails sind in der Jobs-Collection sichtbar.
 
 ## Umsetzungsplan
@@ -234,7 +233,7 @@ Stufe 1 deckt alle genannten Anforderungen ab; Stufe 2 bringt Komfort und die We
 
 **Stufe 1 – Kern**
 
-1. Payload-Projekt aufsetzen (Postgres, Docker, Domain); Collections, Rechte-Regeln, Benutzer mit Rollen.
+1. Payload-Projekt aufsetzen (SQLite, Docker, Domain); Collections, Rechte-Regeln, Benutzer mit Rollen.
 2. OpenAPI-Datei für die Fach-Endpunkte schreiben, Dart-Client generieren.
 3. Gast-Endpunkte: Anfrage ohne Login, persönlicher Link, Bilder, Belegung.
 4. Statuswechsel-Endpunkte mit Historie, bedingten Updates und Überschneidungswarnung; telefonische Anmeldung.
@@ -250,13 +249,24 @@ Stufe 1 deckt alle genannten Anforderungen ab; Stufe 2 bringt Komfort und die We
 2. Push-Benachrichtigungen über das vorhandene Firebase als Alternative zur E-Mail.
 3. Lösch-Job nach 12 Monaten und anonyme Reparaturstatistik (spätestens 12 Monate nach Start nötig).
 
+## Nachtrag 18.11.2026: generisch, SQLite, Unterprojekte
+
+Das System soll auch andere Kommunen nutzen können. Das Repair Café Kremmen ist der erste Nutzer, nicht der einzige. Daraus folgt:
+
+- **Name und Erscheinungsbild sind Einstellungen**, keine Konstanten: Name, Auftragsnummern-Präfix, Farben (primär, Akzent, Text), Logo, Kontakt-, Impressum- und Datenschutz-Links stehen in der Global `einstellungen` und sind öffentlich lesbar unter `GET /api/globals/einstellungen`. Mails, Kalendereinträge, Admin-Panel und alle Frontends holen sich die Werte von dort. Die Beispiele in diesem Konzept (Kremmen, `RC-2026-0042`, `repaircafe.kremmener.info`) sind die Werte der ersten Instanz.
+- **Uhrzeiten sind anpassbar.** Die Tage legen Admins als Veranstaltungen fest. Beginn, Ende, letzte Ankunft und Raster stehen je Veranstaltung und sind mit 10:00, 14:00, 13:00 und 15 Minuten vorbelegt; die Vorbelegung ist in den Einstellungen änderbar. Die Dauer je Reparatur (Standard 60 Minuten) ebenso.
+- **SQLite statt PostgreSQL.** Erwartet werden etwa 10 Termine im Jahr mit je 10 Anmeldungen. Eine SQLite-Datei im Docker-Volume genügt, spart den zweiten Container und macht Backups einfach. Der Wechsel auf PostgreSQL bleibt über den Datenbank-Adapter möglich.
+- **Zwei Unterprojekte:** `backend/` (Payload: REST-API, Admin-Panel, Jobs) und `web/` (Web-Frontend für Gäste und Reparistas, kommt später). Beide Frontends – Web und Ortsfunk-App – sprechen nur die REST-API an; der Vertrag steht in `openapi/openapi.yaml`.
+- **Löschen:** Der Auftrag räumt Bilder, Notizen und Historie vor dem eigenen Löschen ab (`beforeDelete`-Hook), weil die Fremdschlüssel verwaiste Dokumente nicht zulassen.
+
 ## Entscheidungen
 
 Alle offenen Fragen sind geklärt; als Nächstes folgen das Payload-Projekt und die OpenAPI-Datei der Fach-Endpunkte.
 
 | Frage | Entscheidung |
 | --- | --- |
-| Technik | Payload 3 wie bei Beirat-dabei, eigene Instanz; Projektname ReparierBar, Git-Repo reparierbar (18.11.2026) |
+| Technik | Payload 3 wie bei Beirat-dabei, eigene Instanz; Projektname ReparierBar, Git-Repo reparierbar (18.11.2026); SQLite statt PostgreSQL |
+| Mandantenfähigkeit | je Kommune eine eigene Instanz; Name, Farben und Standardzeiten über Einstellungen |
 | Termine | feste Termine 10:00–14:00 Uhr; der Gast wünscht eine Ankunftszeit, keine festen Zeitfenster |
 | Dauer je Reparatur | mindestens 1 Stunde, letzte Ankunft 13:00 Uhr |
 | Parallele Reparaturen | ergibt sich aus den Zusagen der Reparistas, keine feste Kapazität |

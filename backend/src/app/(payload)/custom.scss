@@ -1,0 +1,11 @@
+/* Instanz-Farben kommen aus den Einstellungen (CSS-Variablen aus der Logo-Komponente). */
+.btn--style-primary {
+  --bg-color: var(--rc-primary, #1e6f5c);
+  --hover-bg: var(--rc-primary, #1e6f5c);
+  --color: #fff;
+  --hover-color: #fff;
+}
+.nav__link--active,
+.nav a:hover {
+  color: var(--rc-primary, inherit);
+}

@@ -1,6 +1,6 @@
 # ReparierBar
 
-Terminanmeldung für das **Repair Café Kremmen**.
+Terminanmeldung für **Repair Cafés** – gedacht für jede Kommune, die ein Repair Café betreibt. Das Repair Café Kremmen ist der erste Nutzer.
 
 Gäste melden ein defektes Gerät mit Beschreibung und bis zu 3 Bildern an und wünschen sich eine Ankunftszeit. Die ehrenamtlichen Reparistas sehen die Anfragen vorab, bereiten sich mit Anleitungen und Videos vor und sagen Termine zu. Wer zusagt, wird Verantwortlicher für den Auftrag – ein bestätigter Termin heißt: Es ist jemand da.
 
@@ -8,91 +8,63 @@ Das ausführliche Konzept steht in [`docs/ReparierBar-Konzept.md`](docs/Reparier
 
 ## Kurz erklärt
 
-- **Feste Termine** von 10:00 bis 14:00 Uhr, keine festen Zeitfenster. Der Gast wünscht eine Ankunftszeit (Raster 15 Minuten, letzte Ankunft 13:00 Uhr), pro Reparatur ist mindestens eine Stunde eingeplant.
-- **Kein Login für Gäste.** Zu jeder Anfrage gehört ein persönlicher Link; die Ortsfunk-App speichert ihn automatisch, die Bestätigungsmail liefert ihn mit. Ohne E-Mail ist eine Anmeldung möglich, aber ohne Reservierung.
-- **Reparistas und Admins** melden sich mit E-Mail und Passwort an (Admin-Panel unter `/admin`). Sie bestätigen Termine, machen Gegenvorschläge, übernehmen Aufträge, ändern Termine, legen telefonische Anmeldungen an und pflegen Recherche-Notizen.
-- **Datensparsam:** Die öffentliche Belegung zeigt nur Ankunftszeit, Gerätekategorie, Hersteller und Typ. Kontaktdaten sehen nur der verantwortliche Reparista und Admins; Bilder werden ohne EXIF/GPS gespeichert; Kontaktdaten und Bilder werden 12 Monate nach dem Termin gelöscht.
-- Die **Ortsfunk-App** (Flutter) ist das erste Frontend und nutzt dieselben REST-Endpunkte wie jedes spätere Frontend. Die Anwendung läuft getrennt von Directus und von Beirat-dabei.
+- **Feste Tage, flexible Uhrzeit.** Admins legen die Veranstaltungstage fest. Vorgabe ist 10:00–14:00 Uhr mit Ankunft bis 13:00 Uhr im 15-Minuten-Raster und einer Stunde je Reparatur; alles ist je Veranstaltung und als Vorgabe in den Einstellungen änderbar.
+- **Kein Login für Gäste.** Zu jeder Anfrage gehört ein persönlicher Link. Ohne E-Mail ist eine Anmeldung möglich, aber ohne Reservierung.
+- **Reparistas und Admins** melden sich mit E-Mail und Passwort an. Sie bestätigen Termine, machen Gegenvorschläge, übernehmen Aufträge, ändern Termine, legen telefonische Anmeldungen an und pflegen Recherche-Notizen.
+- **Datensparsam:** Die öffentliche Belegung zeigt nur Ankunftszeit, Gerätekategorie, Hersteller und Typ. Kontaktdaten sehen nur der verantwortliche Reparista und Admins; Bilder werden ohne EXIF/GPS gespeichert; Kontaktdaten und Bilder werden nach der Löschfrist (Standard 12 Monate) gelöscht.
+- **Generisch:** Name, Auftragsnummern-Präfix, Farben, Logo und Standardzeiten stehen in den *Einstellungen* im Admin-Panel und sind öffentlich lesbar unter `GET /api/globals/einstellungen`. Mails, Kalendereinträge und Frontends übernehmen sie. Pro Kommune läuft eine eigene Instanz.
 
-## Technik
+## Aufbau
 
-| Baustein | Umsetzung |
+| Ordner | Inhalt |
 | --- | --- |
-| Anwendung | Payload 3 auf Next.js, TypeScript |
-| Datenbank | PostgreSQL 16 (`@payloadcms/db-postgres`) |
-| Benutzer | Auth-Collection `benutzer` mit Rollen `REPARISTA` und `ADMIN` |
-| Gast-Zugang | persönlicher Link mit 256-Bit-Schlüssel (nur SHA-256-Hash in der DB), Header `X-Auftrag-Schluessel` |
-| Fachlogik | eigene Endpunkte für Statuswechsel (bedingte Updates, `409 Conflict`), Historie in `ereignisse`, Rechte-Regeln und Hooks |
-| Mail | SMTP über `nodemailer`, Versand als Job in der Payload Jobs Queue |
-| Zeitgesteuert | Erinnerung am Vortag (10:00 Uhr), Hinweis an Admins bei unbestätigten Anfragen (3 Tage vorher), Löschfrist (nachts) |
-| Bilder | Upload-Collection mit sharp (max. 1600 px, JPEG, ohne EXIF), höchstens 3 je Auftrag |
-| API-Vertrag | [`openapi/openapi.yaml`](openapi/openapi.yaml) für die Fach-Endpunkte (Grundlage für den Dart-Client) |
-| Betrieb | Docker Compose auf `ofuk125`, Domain `repaircafe.kremmener.info` |
+| [`backend/`](backend) | Payload 3 auf Next.js: REST-API, Admin-Panel, Jobs. SQLite-Datenbank, Bilder im Dateisystem. |
+| [`web/`](web) | Web-Frontend für Gäste und Reparistas – kommt später ([Plan](web/README.md)). |
+| [`openapi/`](openapi) | Vertrag der Fach-Endpunkte; Grundlage für Web-Frontend und Dart-Client der Ortsfunk-App. |
+| [`docs/`](docs) | Konzept. |
 
-## Projektstruktur
+Frontends sprechen nur die REST-API an. Das Admin-Panel unter `/admin` reicht für den Anfang für Reparistas und Admins.
 
-```
-docs/                  Konzept
-openapi/openapi.yaml   OpenAPI-Beschreibung der Fach-Endpunkte
-src/
-  payload.config.ts    Konfiguration (DB, Mail, Jobs, CORS/CSRF)
-  collections/         auftraege, bilder, notizen, ereignisse, veranstaltungen,
-                       geraetekategorien, benutzer, email-sperren
-  access/              Rechte-Hilfen
-  endpoints/           gast, auftraege (Reparista), veranstaltungen (Belegung, Tagesliste), admin
-  lib/                 Auftrags-Service (Statuswechsel), Mail-Vorlagen, Token, Zeit, ICS
-  jobs/                sendeMail, erinnerung, loeschung
-  components/          Aktions-Knöpfe im Admin-Panel
-  app/                 Next.js (Admin, API-Routen, Platzhalter für persönliche Links)
-tests/                 Unit-Tests (Zeit, Termin-Regeln, Token)
-```
-
-## Lokal entwickeln
-
-Voraussetzungen: Node.js ≥ 22 und eine PostgreSQL-16-Datenbank.
+## Mit Docker starten
 
 ```bash
-cp .env.example .env          # PAYLOAD_SECRET, DATABASE_URI usw. anpassen
-# für die lokale Entwicklung: DB_PUSH=true (Schema wird direkt angelegt)
-npm install
-npm run dev                   # http://localhost:3000/admin – ersten Admin anlegen
-```
-
-Nützliche Befehle:
-
-```bash
-npm run typecheck             # TypeScript prüfen
-npm test                      # Unit-Tests
-npm run generate:types        # src/payload-types.ts nach Schema-Änderungen neu erzeugen
-npm run generate:importmap    # Admin-Importmap nach neuen Komponenten
-npm run migrate:create        # Migration aus dem aktuellen Schema erzeugen
-```
-
-Ohne `SMTP_HOST` werden Mails nicht verschickt, sondern nur über den JSON-Transport erzeugt.
-
-Nach dem Anlegen des ersten Admins werden unter *Gerätekategorien* die Auswahlwerte und unter *Veranstaltungen* die Termine gepflegt. Reparistas legt ein Admin unter *Benutzer* an; Passwort setzen sie über „Passwort vergessen“.
-
-## Deployment
-
-```bash
-cp .env.example .env          # Werte für den Server eintragen, DB_PASSWORD setzen, DB_PUSH=false
+cp .env.example .env     # PAYLOAD_SECRET (langer Zufallswert), PUBLIC_URL, INSTANZ_NAME, SMTP … eintragen
 docker compose up -d --build
 ```
 
-Der Stack besteht aus `rc-app` (Payload + Next.js), `rc-db` (PostgreSQL 16, nur im internen Docker-Netz) und dem Volume `rc-bilder`. `rc-app` hört auf `127.0.0.1:3100`; der bestehende Reverse Proxy leitet `repaircafe.kremmener.info` dorthin. Beim Start laufen zuerst die Datenbank-Migrationen (`payload migrate`). Für den Uptime-Check gibt es `/api/health`.
+Der Dienst hört auf `127.0.0.1:3100` (hinter einen Reverse Proxy mit TLS stellen). Beim Start laufen die Datenbank-Migrationen. Die SQLite-Datei und die Bilder liegen im Volume `daten`.
 
-**Vor dem ersten Deployment** muss die Anfangsmigration erzeugt und eingecheckt werden:
+Danach `PUBLIC_URL/admin` öffnen: Der erste angelegte Benutzer wird Admin. Dann unter *Einstellungen* Name, Farben und Standardzeiten setzen, unter *Veranstaltungen* die Termine anlegen und unter *Benutzer* die Reparistas einladen (Passwort setzen sie über „Passwort vergessen“). Gerätekategorien werden beim ersten Start vorbelegt und sind frei pflegbar.
+
+**Backup:** das Volume `daten` sichern (SQLite-Datei per `sqlite3 reparierbar.db ".backup …"` kopieren, solange die App läuft, und den Ordner `bilder`).
+
+## Lokal entwickeln
+
+Voraussetzung: Node.js ≥ 22.
 
 ```bash
-DB_PUSH=false npm run migrate:create   # gegen eine leere lokale Datenbank
+cd backend
+cp .env.example .env
+npm install
+DB_PUSH=true npm run dev      # http://localhost:3000/admin
 ```
 
-Backup: nächtlich `pg_dump` der Datenbank plus das Volume `rc-bilder`.
+```bash
+npm run typecheck             # TypeScript prüfen
+npm test                      # Unit-Tests (Zeit, Termin-Regeln, Token)
+npm run e2e                   # Ende-zu-Ende-Test gegen ein laufendes Backend mit frischer Datenbank
+npm run test:jobs             # Erinnerung und Löschfrist (frische Datenbank)
+npm run generate:types        # nach Schema-Änderungen
+npm run migrate:create        # Migration für Schema-Änderungen erzeugen und einchecken
+```
+
+Ohne `SMTP_HOST` werden keine Mails verschickt. Sie erscheinen als Jobs in der Jobs-Collection (Admin-Panel, Gruppe „System“), Fehler ebenfalls.
 
 ## Schnittstelle in Kürze
 
 | Wer | Pfad | Zweck |
 | --- | --- | --- |
+| öffentlich | `GET /api/globals/einstellungen` | Name, Farben, Standardzeiten |
 | öffentlich | `GET /api/veranstaltungen`, `/api/geraetekategorien` | Termine und Auswahllisten |
 | öffentlich | `GET /api/veranstaltungen/:id/belegung` | Belegung ohne Personendaten |
 | Gast | `POST /api/gast/anfrage` | Anfrage ohne Login, Antwort mit persönlichem Link |
@@ -101,16 +73,16 @@ Backup: nächtlich `pg_dump` der Datenbank plus das Volume `rc-bilder`.
 | Reparista | `GET /api/veranstaltungen/:id/tagesliste` | Tagesliste mit Notizen |
 | Admin | `POST /api/admin/bereinigung` | Aufträge vor einem Datum löschen (`dryRun`) |
 
-Alle Details stehen in der [OpenAPI-Datei](openapi/openapi.yaml).
+Alle Details: [`openapi/openapi.yaml`](openapi/openapi.yaml).
 
 ## Stand
 
-Umgesetzt ist **Stufe 1 des Backends** aus dem Konzept: Collections mit Rechten und Hooks, alle Fach-Endpunkte mit Historie und Überschneidungswarnung, Mails und Jobs, Löschung/Bereinigung, Admin-Knöpfe für die Statuswechsel, OpenAPI, Docker. Typecheck und Unit-Tests laufen; das Zusammenspiel mit PostgreSQL wurde noch nicht gegen eine echte Datenbank getestet.
+Umgesetzt ist das Backend aus Stufe 1 des Konzepts. Typecheck, Unit-Tests, ein Ende-zu-Ende-Test (20 Prüfungen) und ein Jobs-Test laufen gegen SQLite durch. Der Docker-Build wurde noch nicht ausgeführt.
 
-Noch offen:
+Offen:
 
-- Anfangsmigration erzeugen (siehe oben) und Ende-zu-Ende-Test gegen PostgreSQL
+- Web-Frontend (`web/`), Dart-Client und Bereich „Repair Café“ in der Ortsfunk-App
 - Admin-Ansicht für die Tagesliste (der Endpunkt existiert)
-- Dart-Client aus der OpenAPI-Datei und der Bereich „Repair Café“ in der Ortsfunk-App
-- Stufe 2: Gäste-Webseite, Push-Benachrichtigungen, Reparaturstatistik
-- Impressum, Datenschutzhinweise, AV-Verträge (Strato, Mailanbieter)
+- Push-Benachrichtigungen, Reparaturstatistik
+- Impressum, Datenschutzhinweise, AV-Verträge je Betreiber
+- Lizenz festlegen, bevor das Repo öffentlich wird

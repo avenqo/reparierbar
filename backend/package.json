@@ -1,0 +1,48 @@
+{
+  "name": "reparierbar",
+  "version": "0.1.0",
+  "description": "ReparierBar – Terminanmeldung für das Repair Café Kremmen (Payload 3)",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
+    "build": "cross-env NODE_OPTIONS=--no-deprecation next build",
+    "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
+    "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
+    "generate:types": "payload generate:types",
+    "generate:importmap": "payload generate:importmap",
+    "migrate": "payload migrate",
+    "migrate:create": "payload migrate:create",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "node scripts/e2e.mjs",
+    "test:jobs": "payload run scripts/jobs-test.ts"
+  },
+  "dependencies": {
+    "@payloadcms/db-sqlite": "3.94.0",
+    "@payloadcms/email-nodemailer": "3.94.0",
+    "@payloadcms/next": "3.94.0",
+    "@payloadcms/richtext-lexical": "3.94.0",
+    "@payloadcms/translations": "3.94.0",
+    "@payloadcms/ui": "3.94.0",
+    "cross-env": "^7.0.3",
+    "graphql": "^16.8.1",
+    "next": "^16.4.6",
+    "nodemailer": "^7.0.0",
+    "payload": "3.94.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sharp": "^0.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/nodemailer": "^7.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
