@@ -1,4 +1,4 @@
-# Beispiel für einen vorhandenen nginx (HTTPS z. B. mit certbot ergänzen)
+# nginx-Vorlage; HTTPS danach mit certbot --nginx ergänzen
 server {
     listen 80;
     server_name repaircafe.kremmener.info;

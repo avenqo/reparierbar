@@ -1,19 +1,20 @@
 # Installation auf einem Server (Docker)
 
 Ziel: eine laufende Instanz unter einer eigenen Domain, z. B. `https://repaircafe.kremmener.info`.
-Voraussetzungen: ein Linux-Server mit Docker (Compose v2), eine Domain, ein SMTP-Zugang für Mails (optional, aber für Rückmeldungen an Gäste nötig).
+Voraussetzungen: ein Linux-Server mit Docker (Compose v2) und nginx, eine Domain, ein SMTP-Zugang für Mails (optional, aber für Rückmeldungen an Gäste nötig).
 
 ## 1. DNS
 
 Beim Domainanbieter einen **A-Record** (und ggf. AAAA) für `repaircafe.kremmener.info` auf die öffentliche IP des Servers setzen.
-Prüfen: `dig +short repaircafe.kremmener.info` zeigt die Server-IP. Erst danach Schritt 4, sonst scheitert das Zertifikat.
+Prüfen: `dig +short repaircafe.kremmener.info` zeigt die Server-IP. Erst danach das Zertifikat (Schritt 4) holen, sonst scheitert es.
 
 ## 2. Code auf den Server
 
+Beliebiges Verzeichnis, hier `<VERZEICHNIS>` genannt (der Pfad ist egal; alle Befehle laufen darin):
+
 ```bash
-sudo mkdir -p /opt/reparierbar && sudo chown $USER /opt/reparierbar
-git clone https://github.com/avenqo/reparierbar.git /opt/reparierbar
-cd /opt/reparierbar
+git clone https://github.com/avenqo/reparierbar.git <VERZEICHNIS>
+cd <VERZEICHNIS>
 ```
 
 (Ist das Repository privat, vorher einen Deploy-Key oder Token einrichten.)
@@ -33,33 +34,27 @@ Wichtig in `.env`:
 |---|---|
 | `PAYLOAD_SECRET` | langer Zufallswert. **Nie ändern und sichern:** daraus entstehen die Mail-Tokens, ein Wechsel entwertet alle Links |
 | `PUBLIC_URL` | `https://repaircafe.kremmener.info` (steht in Mail-Links und steuert das Secure-Cookie) |
-| `DOMAIN` | `repaircafe.kremmener.info` (nur für Caddy) |
+| `PORT` | optional, Host-Port für nginx (Vorgabe `3100`, nur auf `127.0.0.1`) |
 | `INSTANZ_NAME` | Vorgabename, später im Admin-Panel änderbar |
 | `MAIL_FROM`, `SMTP_*` | Zugang des Mail-Anbieters |
 | `ANDROID_*`, `IOS_APP_ID` | später für App Links der Ortsfunk-App |
 
-## 4. Starten – Variante A: Caddy im Compose (empfohlen, wenn 80/443 frei sind)
+## 4. Starten und nginx einrichten
 
 ```bash
-cd /opt/reparierbar
-docker compose -f docker-compose.yml -f deploy/docker-compose.caddy.yml up -d --build
+cd <VERZEICHNIS>
+docker compose up -d --build
 docker compose ps
 docker compose logs -f backend
 ```
 
-Caddy holt das Zertifikat automatisch. Firewall: Ports 80 und 443 offen lassen (`sudo ufw allow 80,443/tcp`).
+Der Dienst hört nur auf `127.0.0.1:3100` (nicht öffentlich). Dann nginx:
 
-### Variante B: vorhandener Reverse Proxy
-
-Läuft auf dem Server schon nginx/Caddy/Traefik (z. B. wegen Directus), nur das Backend starten:
-
-```bash
-docker compose up -d --build
-```
-
-Der Dienst hört dann auf `127.0.0.1:3100`. Im Proxy die Domain dorthin weiterleiten, Beispiel: `deploy/nginx.conf.beispiel`
-(Upload-Limit mindestens 25 MB, Header `Host` und `X-Forwarded-Proto` durchreichen; danach HTTPS z. B. mit `certbot --nginx`).
-Bei Caddy: `repaircafe.kremmener.info { reverse_proxy 127.0.0.1:3100 }`.
+1. `deploy/nginx.conf.beispiel` nach `/etc/nginx/sites-available/repaircafe` kopieren, `server_name` und bei geändertem `PORT` den Port anpassen, nach `sites-enabled` verlinken.
+   Wichtig: `client_max_body_size 25m;` (Foto-Uploads) und die Header `Host` und `X-Forwarded-Proto`.
+2. `sudo nginx -t && sudo systemctl reload nginx`
+3. HTTPS: `sudo certbot --nginx -d repaircafe.kremmener.info` (ergänzt den 443-Block und die Weiterleitung von http auf https).
+4. Firewall: 80 und 443 offen.
 
 ## 5. Prüfen
 
@@ -93,8 +88,8 @@ Dann im Browser `https://repaircafe.kremmener.info/admin` öffnen.
 - **Update:**
 
   ```bash
-  cd /opt/reparierbar && git pull
-  docker compose -f docker-compose.yml -f deploy/docker-compose.caddy.yml up -d --build   # bei Variante B ohne zweite Datei
+  cd <VERZEICHNIS> && git pull
+  docker compose up -d --build
   ```
 
   Datenbank-Migrationen laufen beim Start automatisch. Vorher sichern.
@@ -105,9 +100,9 @@ Dann im Browser `https://repaircafe.kremmener.info/admin` öffnen.
 
 | Symptom | Ursache |
 |---|---|
-| Zertifikat wird nicht ausgestellt | DNS zeigt noch nicht auf den Server, oder Port 80/443 belegt/gesperrt |
+| Zertifikat wird nicht ausgestellt | DNS zeigt noch nicht auf den Server, oder Port 80/443 gesperrt |
 | Login im Admin klappt, danach sofort abgemeldet | `PUBLIC_URL` stimmt nicht mit der Adresse im Browser überein (http/https, Domain) |
 | Fehler „CSRF“/„Origin“ bei Anfragen | dito, bzw. Web-Frontend-Domain fehlt in `CORS_ORIGINS` |
-| Uploads schlagen fehl (413) | Upload-Limit im Reverse Proxy zu klein |
+| Uploads schlagen fehl (413) | `client_max_body_size` in nginx zu klein |
 | Mails kommen nicht an | `SMTP_*`, `MAIL_FROM` (Absenderdomain, SPF/DKIM beim Mailanbieter) prüfen |
 | Container startet nicht | `docker compose logs backend`; häufig fehlt `PAYLOAD_SECRET` |
