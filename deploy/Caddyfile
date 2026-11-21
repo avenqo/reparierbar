@@ -1,0 +1,8 @@
+{$DOMAIN} {
+	encode gzip
+	# Bilder-Uploads (3 Fotos à bis 5 MB)
+	request_body {
+		max_size 25MB
+	}
+	reverse_proxy backend:3000
+}

@@ -23,7 +23,7 @@ Das ausführliche Konzept steht in [`docs/ReparierBar-Konzept.md`](docs/Reparier
 | [`backend/`](backend) | Payload 3 auf Next.js: REST-API, Admin-Panel, Jobs. SQLite-Datenbank, Bilder im Dateisystem. |
 | [`web/`](web) | Web-Frontend für Gäste und Reparistas – kommt später ([Plan](web/README.md)). |
 | [`openapi/`](openapi) | Vertrag der Fach- und der benötigten Standard-Endpunkte; Grundlage für Web-Frontend und Dart-Client der Ortsfunk-App. |
-| [`docs/`](docs) | Konzept, [Ortsfunk-Spezifikation](docs/Ortsfunk-Spezifikation.md), [Datenschutz-Vorlage](docs/Datenschutz-Vorlage.md). |
+| [`docs/`](docs) | Konzept, [Ortsfunk-Spezifikation](docs/Ortsfunk-Spezifikation.md), [Datenschutz-Vorlage](docs/Datenschutz-Vorlage.md), [Installation auf einem Server](docs/Installation.md). |
 
 Frontends sprechen nur die REST-API an. Das Admin-Panel unter `/admin` reicht für den Anfang für Reparistas und Admins.
 
