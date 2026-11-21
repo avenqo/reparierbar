@@ -3,8 +3,8 @@ info:
   title: ReparierBar – Fach-Endpunkte
   version: 0.1.0
   description: |
-    Fach-Endpunkte der ReparierBar (Repair Café Kremmen). Die Standard-Endpunkte von Payload
-    (`/api/<collection>`, Login unter `/api/benutzer/login` …) sind hier nicht beschrieben.
+    Fach-Endpunkte der ReparierBar (Repair Café Kremmen). Dazu die Standard-Endpunkte von Payload, soweit Ortsfunk-App und Web sie brauchen
+    (Login, Einstellungen, Listen). Nicht beschrieben: Admin-Panel, Schreibzugriffe auf andere Sammlungen.
     Fehler kommen im Payload-Format `{ "errors": [{ "message": "…" }] }`.
     Gäste melden sich nie an: Sie schicken den Schlüssel ihres persönlichen Links im Header
     `X-Auftrag-Schluessel`. Reparistas und Admins nutzen das Cookie bzw. `Authorization: JWT <token>`.
@@ -141,6 +141,125 @@ components:
             properties:
               id: { type: integer }
               reihenfolge: { type: integer, nullable: true }
+    Einstellungen:
+      type: object
+      description: Öffentlich lesbar. Name, Farben, Texte und Standardzeiten der Instanz.
+      properties:
+        name: { type: string, example: Repair Café Kremmen }
+        nummernPraefix: { type: string, example: RC }
+        kontaktEmail: { type: string, nullable: true }
+        webseiteUrl: { type: string, nullable: true }
+        impressumUrl: { type: string, nullable: true, description: Externer Link; hat Vorrang vor `impressum` }
+        datenschutzUrl: { type: string, nullable: true, description: Externer Link; hat Vorrang vor `datenschutz` }
+        impressum: { type: string, nullable: true, description: Markdown }
+        datenschutz: { type: string, nullable: true, description: Markdown }
+        einwilligungstext: { type: string, description: Text der Einwilligung beim Anmelden (Markdown/Klartext) }
+        farbePrimaer: { type: string, example: '#1e6f5c' }
+        farbeAkzent: { type: string }
+        farbeText: { type: string }
+        logoUrl: { type: string, nullable: true }
+        standardBeginn: { $ref: '#/components/schemas/Uhrzeit' }
+        standardEnde: { $ref: '#/components/schemas/Uhrzeit' }
+        standardLetzteAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        standardRaster: { type: integer, example: 15 }
+        standardDauerMinuten: { type: integer, example: 60 }
+        loeschfristMonate: { type: integer }
+    Veranstaltung:
+      type: object
+      properties:
+        id: { type: integer }
+        datum: { type: string, format: date-time, description: Tag der Veranstaltung (UTC-Zeitstempel; in Europe/Berlin umrechnen) }
+        beginn: { $ref: '#/components/schemas/Uhrzeit' }
+        ende: { $ref: '#/components/schemas/Uhrzeit' }
+        letzteAnkunft: { $ref: '#/components/schemas/Uhrzeit' }
+        rasterMinuten: { type: integer }
+        ort: { type: string }
+        anmeldeschluss: { type: string, format: date-time, nullable: true }
+        status: { type: string, enum: [GEPLANT, ABGESAGT, ABGESCHLOSSEN] }
+    Geraetekategorie:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        reihenfolge: { type: integer }
+    BenutzerProfil:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        rolle: { type: string, enum: [REPARISTA, ADMIN], description: ADMIN darf alles, was REPARISTA darf }
+        aktiv: { type: boolean }
+        fachgebiete: { type: array, items: { type: string } }
+    LoginAntwort:
+      type: object
+      properties:
+        message: { type: string }
+        token: { type: string, description: JWT, 12 Stunden gültig }
+        exp: { type: integer, description: Ablauf als Unix-Zeit (Sekunden) }
+        user: { $ref: '#/components/schemas/BenutzerProfil' }
+    AuftragDokument:
+      type: object
+      description: |
+        Auftrag aus der Standard-API (nur Reparista/Admin). Zeitfelder kommen hier als UTC-Zeitstempel
+        (`date-time`), nicht als `HH:mm`; für die Anzeige nach Europe/Berlin umrechnen. Mit `depth=0`
+        sind Beziehungen reine IDs. `kontakt` fehlt für Reparistas, die nicht verantwortlich sind.
+      properties:
+        id: { type: integer }
+        nummer: { type: string }
+        status: { $ref: '#/components/schemas/Status' }
+        kanal: { type: string, enum: [APP, WEB, TELEFON] }
+        geraetekategorie: { type: integer }
+        hersteller: { type: string, nullable: true }
+        typ: { type: string, nullable: true }
+        fehlerbeschreibung: { type: string, nullable: true }
+        veranstaltung: { type: integer }
+        wunschAnkunft: { type: string, format: date-time, nullable: true }
+        terminAnkunft: { type: string, format: date-time, nullable: true }
+        vorschlagAnkunft: { type: string, format: date-time, nullable: true }
+        dauerMinuten: { type: integer, nullable: true }
+        verantwortlich: { type: integer, nullable: true }
+        vertretungGesucht: { type: boolean }
+        ergebnis: { $ref: '#/components/schemas/Ergebnis' }
+        emailVorhanden: { type: boolean }
+        kontakt:
+          type: object
+          properties:
+            name: { type: string, nullable: true }
+            email: { type: string, nullable: true }
+            telefon: { type: string, nullable: true }
+            einwilligungAm: { type: string, format: date-time, nullable: true }
+            einwilligungVersion: { type: string, nullable: true, example: 3fa9c1d0, description: Kurzkennung des damals gezeigten Einwilligungs- und Datenschutztextes }
+    Notiz:
+      type: object
+      properties:
+        id: { type: integer }
+        auftrag: { type: integer }
+        autor: { type: integer }
+        text: { type: string, maxLength: 4000 }
+        createdAt: { type: string, format: date-time }
+    Ereignis:
+      type: object
+      properties:
+        id: { type: integer }
+        auftrag: { type: integer }
+        zeitpunkt: { type: string, format: date-time }
+        akteurTyp: { type: string, enum: [GAST, BENUTZER, SYSTEM] }
+        akteur: { type: integer, nullable: true }
+        aktion: { type: string }
+        vorher: { type: object, nullable: true }
+        nachher: { type: object, nullable: true }
+    Liste:
+      type: object
+      description: Paginierte Liste der Standard-API (`docs` je nach Sammlung)
+      properties:
+        docs: { type: array, items: { type: object } }
+        totalDocs: { type: integer }
+        limit: { type: integer }
+        page: { type: integer }
+        totalPages: { type: integer }
+        hasNextPage: { type: boolean }
+        hasPrevPage: { type: boolean }
 paths:
   /veranstaltungen/{id}/belegung:
     get:
@@ -540,3 +659,244 @@ paths:
       responses:
         '200': { description: ok }
         '503': { description: Datenbank nicht erreichbar }
+  /globals/einstellungen:
+    get:
+      tags: [Öffentlich]
+      summary: Name, Farben, Logo, Standardzeiten, Impressum, Datenschutz, Einwilligungstext
+      description: App und Web laden das beim Start und zeigen Name, Farben und Rechtstexte daraus an.
+      responses:
+        '200':
+          description: Einstellungen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Einstellungen' }
+  /veranstaltungen:
+    get:
+      tags: [Öffentlich]
+      summary: Veranstaltungen auflisten
+      description: "Beispiel: `?where[datum][greater_than_equal]=2026-11-01&where[status][equals]=GEPLANT&sort=datum&limit=20`"
+      parameters:
+        - { name: where, in: query, style: deepObject, explode: true, schema: { type: object } }
+        - { name: sort, in: query, schema: { type: string, example: datum } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: Liste (docs = Veranstaltung)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Liste' }
+  /veranstaltungen/{id}:
+    get:
+      tags: [Öffentlich]
+      summary: Eine Veranstaltung
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          description: Veranstaltung
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veranstaltung' }
+        '404': { $ref: '#/components/responses/Fehler' }
+  /geraetekategorien:
+    get:
+      tags: [Öffentlich]
+      summary: Gerätekategorien für das Anmeldeformular
+      parameters:
+        - { name: sort, in: query, schema: { type: string, example: reihenfolge } }
+        - { name: limit, in: query, schema: { type: integer, example: 100 } }
+      responses:
+        '200':
+          description: Liste (docs = Geraetekategorie)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Liste' }
+  /benutzer/login:
+    post:
+      tags: [Reparista]
+      summary: Anmelden
+      description: Nach 5 Fehlversuchen 10 Minuten gesperrt. Das Token als `Authorization&#58; JWT <token>` senden.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Angemeldet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginAntwort' }
+        '401': { $ref: '#/components/responses/Fehler' }
+  /benutzer/logout:
+    post:
+      tags: [Reparista]
+      summary: Abmelden
+      security: [{ benutzerJwt: [] }]
+      responses:
+        '200': { description: Abgemeldet }
+  /benutzer/me:
+    get:
+      tags: [Reparista]
+      summary: Angemeldeten Benutzer lesen
+      security: [{ benutzerJwt: [] }]
+      responses:
+        '200':
+          description: "`user` ist null, wenn das Token ungültig ist"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { allOf: [{ $ref: '#/components/schemas/BenutzerProfil' }], nullable: true }
+                  exp: { type: integer }
+  /benutzer/refresh-token:
+    post:
+      tags: [Reparista]
+      summary: Token verlängern
+      security: [{ benutzerJwt: [] }]
+      responses:
+        '200':
+          description: Neues Token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginAntwort' }
+        '401': { $ref: '#/components/responses/Fehler' }
+  /benutzer/forgot-password:
+    post:
+      tags: [Reparista]
+      summary: Passwort-Zurücksetzen-Mail anfordern
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties: { email: { type: string, format: email } }
+      responses:
+        '200': { description: Mail verschickt (Antwort ist immer gleich) }
+  /benutzer/reset-password:
+    post:
+      tags: [Reparista]
+      summary: Neues Passwort setzen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: Passwort gesetzt }
+        '400': { $ref: '#/components/responses/Fehler' }
+  /auftraege:
+    get:
+      tags: [Reparista]
+      summary: Aufträge auflisten
+      description: |
+        Nur Reparista/Admin. Beispiele: `?where[veranstaltung][equals]=7&limit=100&depth=0` (Übersicht),
+        `?where[verantwortlich][equals]=<meineId>&where[status][in]=BESTAETIGT,UEBERNOMMEN` (meine Aufträge).
+      security: [{ benutzerJwt: [] }]
+      parameters:
+        - { name: where, in: query, style: deepObject, explode: true, schema: { type: object } }
+        - { name: sort, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: depth, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        '200':
+          description: Liste (docs = AuftragDokument)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Liste' }
+        '403': { $ref: '#/components/responses/Fehler' }
+  /auftraege/{id}:
+    get:
+      tags: [Reparista]
+      summary: Einen Auftrag lesen
+      security: [{ benutzerJwt: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+        - { name: depth, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        '200':
+          description: Auftrag
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuftragDokument' }
+        '403': { $ref: '#/components/responses/Fehler' }
+        '404': { $ref: '#/components/responses/Fehler' }
+  /notizen:
+    get:
+      tags: [Reparista]
+      summary: Notizen zu einem Auftrag
+      description: "`?where[auftrag][equals]=<id>&sort=createdAt`"
+      security: [{ benutzerJwt: [] }]
+      parameters:
+        - { name: where, in: query, style: deepObject, explode: true, schema: { type: object } }
+        - { name: sort, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Liste (docs = Notiz)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Liste' }
+    post:
+      tags: [Reparista]
+      summary: Notiz anlegen (Autor wird gesetzt)
+      security: [{ benutzerJwt: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [auftrag, text]
+              properties:
+                auftrag: { type: integer }
+                text: { type: string, maxLength: 4000 }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  doc: { $ref: '#/components/schemas/Notiz' }
+                  message: { type: string }
+        '403': { $ref: '#/components/responses/Fehler' }
+  /ereignisse:
+    get:
+      tags: [Reparista]
+      summary: Historie eines Auftrags (nur lesbar, ohne Klartext-Kontaktdaten)
+      description: "`?where[auftrag][equals]=<id>&sort=zeitpunkt`"
+      security: [{ benutzerJwt: [] }]
+      parameters:
+        - { name: where, in: query, style: deepObject, explode: true, schema: { type: object } }
+        - { name: sort, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Liste (docs = Ereignis)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Liste' }
+  /bilder/file/{name}:
+    get:
+      tags: [Reparista]
+      summary: Bilddatei (auch `vorschau`-Größe 400 px)
+      description: Nur Reparista/Admin; Gäste sehen ihre Bilder über /gast/auftrag/bilder/{id}.
+      security: [{ benutzerJwt: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: JPEG, content: { image/jpeg: { schema: { type: string, format: binary } } } }
+        '403': { $ref: '#/components/responses/Fehler' }
