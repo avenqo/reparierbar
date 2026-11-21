@@ -28,7 +28,7 @@ export const loeschung: TaskConfig<'loeschung'> = {
         collection: 'auftraege',
         id: a.id,
         data: {
-          kontakt: { name: null, email: null, telefon: null, einwilligungAm: null },
+          kontakt: { name: null, email: null, telefon: null, einwilligungAm: null, einwilligungVersion: null },
           hersteller: null,
           typ: null,
           fehlerbeschreibung: null,

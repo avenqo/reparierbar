@@ -51,7 +51,7 @@ export default buildConfig({
     user: 'benutzer',
     importMap: { baseDir: path.resolve(dirname) },
     meta: { icons: [{ rel: 'icon', type: 'image/svg+xml', url: '/logo.svg' }], titleSuffix: ` – ${process.env.INSTANZ_NAME || 'ReparierBar'}` },
-    components: { graphics: { Logo: '/components/Logo#Logo', Icon: '/components/Icon#Icon' } },
+    components: { beforeLogin: ['/components/RechtlicheLinks#RechtlicheLinks'], beforeDashboard: ['/components/RechtlicheLinks#RechtlicheLinks'], graphics: { Logo: '/components/Logo#Logo', Icon: '/components/Icon#Icon' } },
   },
   globals: [Einstellungen],
   collections: [Auftraege, Bilder, Notizen, Ereignisse, Veranstaltungen, Geraetekategorien, Benutzer, EmailSperren],

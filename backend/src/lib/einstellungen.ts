@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { PayloadRequest } from 'payload'
 
 export type Instanz = {
@@ -7,6 +8,9 @@ export type Instanz = {
   webseiteUrl: string | null
   impressumUrl: string | null
   datenschutzUrl: string | null
+  impressum: string | null
+  datenschutz: string | null
+  einwilligungstext: string
   farbePrimaer: string
   farbeAkzent: string
   farbeText: string
@@ -27,6 +31,10 @@ export const STANDARD: Instanz = {
   webseiteUrl: null,
   impressumUrl: null,
   datenschutzUrl: null,
+  impressum: null,
+  datenschutz: null,
+  einwilligungstext:
+    'Ich bin damit einverstanden, dass meine Kontaktdaten (Name, E-Mail, Telefon) zur Abstimmung des Reparaturtermins gespeichert und für Mitteilungen zu meiner Anfrage verwendet werden. Sie werden nach Ablauf der Löschfrist nach dem Termin gelöscht. Details stehen in den Datenschutzhinweisen.',
   farbePrimaer: '#1e6f5c',
   farbeAkzent: '#f2a900',
   farbeText: '#1d2b2a',
@@ -52,4 +60,9 @@ export async function ladeEinstellungen(req: PayloadRequest): Promise<Instanz> {
   } catch {
     return STANDARD
   }
+}
+
+/** Version der Einwilligung: Kurz-Hash über Einwilligungstext und Datenschutzhinweise (wird am Auftrag mitgespeichert). */
+export function einwilligungVersion(e: Pick<Instanz, 'einwilligungstext' | 'datenschutz'>): string {
+  return createHash('sha256').update(`${e.einwilligungstext}\n---\n${e.datenschutz ?? ''}`).digest('hex').slice(0, 8)
 }

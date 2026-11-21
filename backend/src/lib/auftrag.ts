@@ -1,7 +1,7 @@
 import { commitTransaction, initTransaction, killTransaction, type PayloadRequest, type Where } from 'payload'
 import { relId } from '../access'
 import type { Auftrag, Veranstaltung } from './typen'
-import { ladeEinstellungen } from './einstellungen'
+import { einwilligungVersion, ladeEinstellungen } from './einstellungen'
 import { fehler } from './fehler'
 import { emailFeld, idFeld, textFeld } from './eingabe'
 import { schreibeEreignis, type Akteur } from './historie'
@@ -277,7 +277,7 @@ export async function legeAuftragAn(
         dauerMinuten: dauer,
         verantwortlich,
         linkSchluesselHash: hashSchluessel(schluessel),
-        kontakt: hatKontakt ? { name, email, telefon, einwilligungAm: new Date().toISOString() } : undefined,
+        kontakt: hatKontakt ? { name, email, telefon, einwilligungAm: new Date().toISOString(), einwilligungVersion: einwilligungVersion(einstellungen) } : undefined,
       } as never,
       depth: 0,
       req,

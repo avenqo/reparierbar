@@ -136,6 +136,7 @@ export const Auftraege: CollectionConfig = {
         { name: 'email', type: 'email', index: true, label: 'E-Mail' },
         { name: 'telefon', type: 'text', maxLength: 40, label: 'Telefon' },
         { name: 'einwilligungAm', type: 'date', label: 'Einwilligung am' },
+        { name: 'einwilligungVersion', type: 'text', label: 'Version der Einwilligung' },
       ],
     },
   ],

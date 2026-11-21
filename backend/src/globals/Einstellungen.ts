@@ -24,8 +24,24 @@ export const Einstellungen: GlobalConfig = {
             { name: 'nummernPraefix', type: 'text', required: true, defaultValue: STANDARD.nummernPraefix, maxLength: 6, label: 'Präfix der Auftragsnummer', admin: { description: 'Nummern sehen aus wie RC-2026-0042. Nur Großbuchstaben und Ziffern.' }, validate: (v: unknown) => /^[A-Z0-9]{1,6}$/.test(String(v)) || 'Nur A–Z und 0–9, höchstens 6 Zeichen' },
             { name: 'kontaktEmail', type: 'email', label: 'Kontakt-E-Mail (öffentlich)' },
             { name: 'webseiteUrl', type: 'text', label: 'Webseite' },
-            { name: 'impressumUrl', type: 'text', label: 'Impressum (URL)' },
-            { name: 'datenschutzUrl', type: 'text', label: 'Datenschutzhinweise (URL)' },
+            { name: 'impressumUrl', type: 'text', label: 'Impressum extern (URL, optional)', admin: { description: 'Nur ausfüllen, wenn das Impressum schon auf einer anderen Seite steht. Hat Vorrang vor dem Text im Tab „Rechtliches“.' } },
+            { name: 'datenschutzUrl', type: 'text', label: 'Datenschutzhinweise extern (URL, optional)', admin: { description: 'Nur ausfüllen, wenn die Hinweise schon auf einer anderen Seite stehen. Hat Vorrang vor dem Text im Tab „Rechtliches“.' } },
+          ],
+        },
+        {
+          label: 'Rechtliches',
+          description: 'Diese Texte erscheinen im Admin-Panel (Anmeldeseite und Navigation), unter /impressum und /datenschutz sowie in den Apps und Frontends. Eingabe als Markdown.',
+          fields: [
+            { name: 'impressum', type: 'textarea', label: 'Impressum (Markdown)', admin: { rows: 14 } },
+            { name: 'datenschutz', type: 'textarea', label: 'Datenschutzhinweise (Markdown)', admin: { rows: 20, description: 'Eine Vorlage zum Anpassen steht in docs/Datenschutz-Vorlage.md. Keine Rechtsberatung.' } },
+            {
+              name: 'einwilligungstext',
+              type: 'textarea',
+              required: true,
+              defaultValue: STANDARD.einwilligungstext,
+              label: 'Einwilligungstext bei der Anmeldung',
+              admin: { rows: 5, description: 'Steht neben dem Kästchen, das Gäste vor der Angabe von Kontaktdaten anhaken. Wird eine Anfrage mit Kontaktdaten gespeichert, merkt sich das System eine Kurzkennung dieser Fassung (Einwilligung und Datenschutzhinweise).' },
+            },
           ],
         },
         {

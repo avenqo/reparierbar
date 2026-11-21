@@ -213,4 +213,18 @@ r = await api('/globals/einstellungen', { method: 'POST', jwt: admin, body: { na
 const n2 = await api('/gast/anfrage', { method: 'POST', body: anfrage() }); erwarte(n2, 201, 'Anfrage mit neuem Präfix'); assert.match(n2.daten.nummer, /^RN-\d{4}-0001$/)
 ok('Einstellungen: öffentlich lesbar, nur Admin ändert, Präfix wirkt auf neue Nummern')
 
+// --- Rechtliches ---
+r = await fetch(`${BASE}/impressum`); assert.equal(r.status, 200); assert((await r.text()).includes('noch nicht hinterlegt'), 'Impressum ohne Text: Hinweis')
+r = await api('/globals/einstellungen', { method: 'POST', jwt: admin, body: { impressum: '# Impressum\n\nMax Muster, **Kremmen**\n\n<script>alert(1)</script>', datenschutz: 'Wir speichern Kontaktdaten.\n\n[x](javascript:alert(1))', einwilligungstext: 'Ich willige ein (Test).' } }); erwarte(r, 200, 'Rechtstexte speichern')
+r = await api('/globals/einstellungen'); assert.equal(r.daten.einwilligungstext, 'Ich willige ein (Test).'); assert(r.daten.impressum.includes('Max Muster'), 'Texte öffentlich lesbar')
+let html = await (await fetch(`${BASE}/impressum`)).text()
+assert(html.includes('<strong>Kremmen</strong>') && !html.includes('<script>alert'), 'Markdown gerendert, HTML maskiert')
+html = await (await fetch(`${BASE}/datenschutz`)).text(); assert(!html.includes('javascript:'), 'unsichere Links entfernt')
+html = await (await fetch(`${BASE}/admin/login`)).text(); assert(html.includes('/impressum') && html.includes('/datenschutz'), 'Admin-Anmeldeseite verlinkt Impressum und Datenschutz')
+const c1 = await api('/gast/anfrage', { method: 'POST', body: anfrage({ kontakt: { name: 'Version' }, einwilligung: true }) }); erwarte(c1, 201, 'Anfrage nach Textänderung')
+const cid = (await api('/auftraege?where[nummer][equals]=' + c1.daten.nummer, { jwt: admin })).daten.docs[0]
+assert.match(cid.kontakt.einwilligungVersion, /^[0-9a-f]{8}$/, 'Version der Einwilligung gespeichert')
+r = await fetch(`${BASE}/.well-known/assetlinks.json`); assert.equal(r.status, 404, 'App Links ohne Konfiguration: 404')
+ok('Rechtliches: Texte in den Einstellungen, öffentliche Seiten, Admin-Links, Einwilligungs-Version am Auftrag')
+
 console.log(`\nAlle ${schritte} Prüfungen bestanden.`)

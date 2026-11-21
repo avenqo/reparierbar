@@ -176,6 +176,7 @@ export interface Auftraege {
     email?: string | null;
     telefon?: string | null;
     einwilligungAm?: string | null;
+    einwilligungVersion?: string | null;
   };
   updatedAt: string;
   createdAt: string;
@@ -561,6 +562,7 @@ export interface AuftraegeSelect<T extends boolean = true> {
         email?: T;
         telefon?: T;
         einwilligungAm?: T;
+        einwilligungVersion?: T;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -776,8 +778,23 @@ export interface Einstellungen {
   nummernPraefix: string;
   kontaktEmail?: string | null;
   webseiteUrl?: string | null;
+  /**
+   * Nur ausfüllen, wenn das Impressum schon auf einer anderen Seite steht. Hat Vorrang vor dem Text im Tab „Rechtliches“.
+   */
   impressumUrl?: string | null;
+  /**
+   * Nur ausfüllen, wenn die Hinweise schon auf einer anderen Seite stehen. Hat Vorrang vor dem Text im Tab „Rechtliches“.
+   */
   datenschutzUrl?: string | null;
+  impressum?: string | null;
+  /**
+   * Eine Vorlage zum Anpassen steht in docs/Datenschutz-Vorlage.md. Keine Rechtsberatung.
+   */
+  datenschutz?: string | null;
+  /**
+   * Steht neben dem Kästchen, das Gäste vor der Angabe von Kontaktdaten anhaken. Wird eine Anfrage mit Kontaktdaten gespeichert, merkt sich das System eine Kurzkennung dieser Fassung (Einwilligung und Datenschutzhinweise).
+   */
+  einwilligungstext: string;
   farbePrimaer?: string | null;
   farbeAkzent?: string | null;
   farbeText?: string | null;
@@ -823,6 +840,9 @@ export interface EinstellungenSelect<T extends boolean = true> {
   webseiteUrl?: T;
   impressumUrl?: T;
   datenschutzUrl?: T;
+  impressum?: T;
+  datenschutz?: T;
+  einwilligungstext?: T;
   farbePrimaer?: T;
   farbeAkzent?: T;
   farbeText?: T;

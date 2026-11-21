@@ -4,6 +4,7 @@ import path from 'node:path'
 import { relId } from '../access'
 import type { Auftrag, Bilder } from '../lib/typen'
 import { ladeGastAuftrag, kurzSicht, legeAuftragAn, leseAnfrage, mitTransaktion, uebergang, type Status } from '../lib/auftrag'
+import { einwilligungVersion, ladeEinstellungen } from '../lib/einstellungen'
 import { emailFeld, idFeld, jsonAntwort, lies, textFeld } from '../lib/eingabe'
 import { fehler } from '../lib/fehler'
 import { schreibeEreignis } from '../lib/historie'
@@ -99,7 +100,7 @@ const dasWarIchNicht: Endpoint = {
         await uebergang(req, {
           id: a.id,
           erlaubt: AKTIV,
-          daten: { status: 'STORNIERT', kontakt: { name: null, email: null, telefon: null, einwilligungAm: null } },
+          daten: { status: 'STORNIERT', kontakt: { name: null, email: null, telefon: null, einwilligungAm: null, einwilligungVersion: null } },
           aktion: 'das_war_ich_nicht',
           akteur: { typ: 'GAST' },
           nachher: { status: 'STORNIERT' },
@@ -151,6 +152,7 @@ const auftragErgaenzen: Endpoint = {
         if (!a.kontakt?.einwilligungAm) {
           if (body.einwilligung !== true) throw fehler(422, 'Für die Speicherung der Kontaktdaten ist eine Einwilligung nötig.')
           kontakt.einwilligungAm = new Date().toISOString()
+          kontakt.einwilligungVersion = einwilligungVersion(await ladeEinstellungen(req))
         }
         daten.kontakt = kontakt
         felder.push('kontakt') // nur der Feldname wird protokolliert, nie der Wert

@@ -16,6 +16,9 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-repaircafe@example.org}
+      ANDROID_PACKAGE: ${ANDROID_PACKAGE:-}
+      ANDROID_SHA256: ${ANDROID_SHA256:-}
+      IOS_APP_ID: ${IOS_APP_ID:-}
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       - daten:/data # SQLite-Datei (/data/db) und Bilder (/data/bilder)
